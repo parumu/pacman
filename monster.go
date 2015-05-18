@@ -6,14 +6,16 @@ import (
 )
 
 type monster struct {
-	loc          xy
-	vec          xy
-	getNextVec   func(m *monster, sc *screen) xy
-	time         int
-	stablePeriod int
+	name          string
+	loc           xy
+	vec           vec
+	getChaseVec   func(m *monster, sc *screen) vec
+	getScatterVec func(m *monster, sc *screen) vec
+	time          int
+	stablePeriod  int
 }
 
-func (m *monster) move(loc xy, vec xy) {
+func (m *monster) move(loc xy, vec vec) {
 	m.loc = loc
 	m.vec = vec
 }
@@ -22,8 +24,26 @@ func (m *monster) liveLife() {
 	m.time = (m.time + 1) % m.stablePeriod
 }
 
-func getNextVecRandomly(_ *monster, _ *screen) xy {
-	return [4]xy{vecDown, vecLeft, vecRight, vecUp}[rand.Intn(4)]
+func getNextVecByHorVer(m *monster, sc *screen) vec {
+	if rand.Intn(2)%2 == 0 {
+		if sc.p.loc.x < m.loc.x {
+			return vecLeft
+		}
+		return vecRight
+	}
+	if sc.p.loc.y < m.loc.y {
+		return vecUp
+	}
+	return vecDown
+}
+
+func getNextVecByHorVerRev(m *monster, sc *screen) vec {
+	vec := getNextVecByHorVer(m, sc)
+	return oppositeVec(vec)
+}
+
+func getNextVecRandomly(_ *monster, _ *screen) vec {
+	return allVecs[rand.Intn(4)]
 }
 
 func getShortestDist2Pacman(loc xy, sc *screen) (bool, int) {
@@ -44,7 +64,7 @@ func getShortestDist2Pacman(loc xy, sc *screen) (bool, int) {
 		sc.mat[loc.y][loc.x] = '+'
 
 		for _, vec := range allVecs {
-			if b, nextLoc := sc.tryMove(loc.add(vec)); b {
+			if b, nextLoc := sc.tryMove(loc.addVec(vec)); b {
 				q.push(nextLoc)
 			}
 		}
@@ -52,20 +72,30 @@ func getShortestDist2Pacman(loc xy, sc *screen) (bool, int) {
 	return false, math.MaxInt16
 }
 
-func getNextVecOfShortestPath(m *monster, sc *screen) xy {
-	minVec, minDist := xy{}, math.MaxInt16
+func getNextVecOfXestPath(m *monster, sc *screen, pred func(int, int) bool, distInit int) vec {
+	retVec, retDist := vec{}, distInit
 
 	for _, vec := range allVecs {
-		canMove, loc := sc.tryMove(m.loc.add(vec))
+		canMove, loc := sc.tryMove(m.loc.addVec(vec))
 		if !canMove {
 			continue
 		}
 		if isReachable, dist := getShortestDist2Pacman(loc, sc); isReachable {
-			if dist < minDist {
-				minDist = dist
-				minVec = vec
+			if pred(dist, retDist) {
+				retDist = dist
+				retVec = vec
 			}
 		}
 	}
-	return minVec
+	return retVec
+}
+
+func getNextVecOfShortestPath(m *monster, sc *screen) vec {
+	smaller := func(a int, b int) bool { return a < b }
+	return getNextVecOfXestPath(m, sc, smaller, math.MaxInt16)
+}
+
+func getNextVecOfLongestPath(m *monster, sc *screen) vec {
+	smaller := func(a int, b int) bool { return a > b }
+	return getNextVecOfXestPath(m, sc, smaller, -1)
 }

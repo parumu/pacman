@@ -2,17 +2,19 @@ package main
 
 type pacman struct {
 	loc        xy
-	vec        xy
+	vec        vec
 	extraPower int
 }
 
-func (p *pacman) move(loc xy, vec xy) {
-	p.loc = loc
-	p.vec = vec
-
+func (p *pacman) liveLife() {
 	if p.extraPower > 0 {
 		p.extraPower--
 	}
+}
+
+func (p *pacman) move(loc xy, vec vec) {
+	p.loc = loc
+	p.vec = vec
 }
 
 func (p *pacman) hasExtraPower() bool {

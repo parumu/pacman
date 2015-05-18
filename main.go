@@ -1,49 +1,66 @@
 package main
 
-import "time"
+import (
+	"time"
 
-var vecLeft, vecRight, vecUp, vecDown = xy{-1, 0}, xy{1, 0}, xy{0, -1}, xy{0, 1}
-var allVecs = []xy{vecLeft, vecRight, vecUp, vecDown}
+	"github.com/parumu/gocurses"
+)
 
-func movePacman(sc *screen, vec xy) {
-	if b, loc := sc.tryMove(sc.p.loc.add(vec)); b {
+func movePacman(sc *screen, vec vec) {
+	sc.p.liveLife()
+
+	if b, loc := sc.tryMove(sc.p.loc.addVec(vec)); b {
 		sc.p.move(loc, vec)
 	}
 }
 
 func moveMonster(sc *screen, m *monster) {
-	for {
+	for i := 0; i < 10; i++ { // exit after 10 tries to avoid infinite loop
 		vec := m.vec
 		if m.time == 0 {
-			vec = m.getNextVec(m, sc)
+			if sc.p.hasExtraPower() {
+				vec = m.getScatterVec(m, sc)
+			} else {
+				vec = m.getChaseVec(m, sc)
+			}
 		}
 		m.liveLife()
 
-		if b, loc := sc.tryMove(m.loc.add(vec)); b {
+		if b, loc := sc.tryMove(m.loc.addVec(vec)); b {
 			m.move(loc, vec)
 			return
 		}
 	}
 }
 
-func getPacmanVec(vec xy) (xy, bool) {
+func getPacmanVec(v vec) (vec, bool) {
 	switch getChFromView() {
-	case 'h':
-		vec = vecLeft
-	case 'j':
-		vec = vecDown
-	case 'k':
-		vec = vecUp
-	case 'l':
-		vec = vecRight
+	case gocurses.KEY_LEFT:
+		v = vecLeft
+	case gocurses.KEY_DOWN:
+		v = vecDown
+	case gocurses.KEY_UP:
+		v = vecUp
+	case gocurses.KEY_RIGHT:
+		v = vecRight
 
 	case 'q':
-		return vec, true
+		return v, true
 	}
-	return vec, false
+	return v, false
 }
 
 func runGame(sc *screen) {
+	pacmanDied := func() bool {
+		if b, m := sc.pacmanMetMonster(); b {
+			if !sc.p.hasExtraPower() {
+				return true
+			}
+			m.loc = sc.monstHome // ate monster
+		}
+		return false
+	}
+
 Game:
 	for {
 		vec, quitGame := getPacmanVec(sc.p.vec)
@@ -51,19 +68,15 @@ Game:
 			break Game
 		}
 		movePacman(sc, vec)
+		if pacmanDied() {
+			break Game
+		}
 
 		for i := 0; i < len(sc.ms); i++ {
 			m := &sc.ms[i]
 			moveMonster(sc, m)
-		}
-
-		if sc.pacmanMetMonster() {
-			if sc.p.hasExtraPower() {
-				// eat monster
-				// reset monster location
-			} else {
-				updateView(sc)
-				break Game // pacman died
+			if pacmanDied() {
+				break Game
 			}
 		}
 
@@ -73,6 +86,7 @@ Game:
 		case powerFood:
 			sc.eatFood()
 			sc.p.addExtraPower(100)
+			sc.resetAllMonstTimes()
 		}
 
 		updateView(sc)
@@ -81,12 +95,34 @@ Game:
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	updateView(sc)
 }
 
 func buildMonsters() []monster {
-	random := monster{getNextVec: getNextVecRandomly, stablePeriod: 5}
-	shortestPath := monster{getNextVec: getNextVecOfShortestPath, stablePeriod: 3}
-	return []monster{random, shortestPath}
+	rand := func(i int) monster {
+		return monster{
+			name:          "Random",
+			getChaseVec:   getNextVecRandomly,
+			getScatterVec: getNextVecRandomly,
+			stablePeriod:  i}
+	}
+	sp := monster{
+		name:          "Shortest Path",
+		getChaseVec:   getNextVecOfShortestPath,
+		getScatterVec: getNextVecOfLongestPath,
+		stablePeriod:  10}
+
+	hv := monster{
+		name:          "Horizontal-Vertical",
+		getChaseVec:   getNextVecByHorVer,
+		getScatterVec: getNextVecByHorVerRev,
+		stablePeriod:  3}
+
+	return []monster{
+		rand(5),
+		rand(3),
+		sp,
+		hv}
 }
 
 func main() {

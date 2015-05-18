@@ -1,28 +1,18 @@
 package main
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 const food = "Food"
 const powerFood = "PowerFood"
 const none = "None"
 
-type xy struct {
-	x, y int
-}
-
-func (a *xy) add(b xy) xy {
-	return xy{a.x + b.x, a.y + b.y}
-}
-
 type screen struct {
-	p    pacman
-	ms   []monster
-	mat  [][]rune
-	size xy
-	dots int
+	p         pacman
+	ms        []monster
+	mat       [][]rune
+	size      xy
+	dots      int
+	monstHome xy
 }
 
 func (sc *screen) cloneMat() [][]rune {
@@ -35,6 +25,12 @@ func (sc *screen) cloneMat() [][]rune {
 		}
 	}
 	return newMat
+}
+
+func (sc *screen) resetAllMonstTimes() {
+	for i := 0; i < len(sc.ms); i++ {
+		sc.ms[i].time = 0
+	}
 }
 
 // returns if loc is on path adjusting loc in warp hole case
@@ -79,13 +75,13 @@ func (sc *screen) eatFood() {
 	}
 }
 
-func (sc *screen) pacmanMetMonster() bool {
-	for _, m := range sc.ms {
-		if m.loc == sc.p.loc {
-			return true
+func (sc *screen) pacmanMetMonster() (bool, *monster) {
+	for i := 0; i < len(sc.ms); i++ {
+		if sc.ms[i].loc == sc.p.loc {
+			return true, &sc.ms[i]
 		}
 	}
-	return false
+	return false, nil
 }
 
 func buildScreen(p pacman, ms []monster) screen {
@@ -129,7 +125,6 @@ func buildScreen(p pacman, ms []monster) screen {
 	for row := 0; row < maxY; row++ {
 		l := strings.TrimRight(lines[row], "|")
 		l = l + strRev(l[0:len(l)-1])
-		fmt.Printf("Adding '%s'\n", l)
 		m[row] = []rune(l)
 	}
 	maxX := len(m[0])
@@ -167,9 +162,10 @@ func buildScreen(p pacman, ms []monster) screen {
 	}
 
 	return screen{
-		p:    p,
-		ms:   ms,
-		mat:  m,
-		size: xy{maxX, maxY},
-		dots: dots}
+		p:         p,
+		ms:        ms,
+		mat:       m,
+		size:      xy{maxX, maxY},
+		dots:      dots,
+		monstHome: mLoc}
 }
