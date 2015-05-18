@@ -2,9 +2,8 @@
 
 Installation
 ----
-1. Install curses library e.g. on mac os x, `$ brew install ncurses`
+1. Install curses library e.g. on mac os x, `$ brew install ncurses`, or on ubuntu, `$ sudo apt-get install libncurses-dev`
 2. `$ go get github.com/parumu/pacman`
-3. `$ go get ./...`
 
 How to play
 ----
