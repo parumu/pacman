@@ -32,13 +32,14 @@ func updateView(sc *screen) {
 	gocurses.Attron(gocurses.A_BOLD)
 
 	p := 'P'
-	if sc.extraPower > 0 {
+	if sc.p.hasExtraPower() {
 		p = 'S'
 	}
-	gocurses.Mvaddch(sc.p.y, sc.p.x, p)
+	gocurses.Mvaddch(sc.p.loc.y, sc.p.loc.x, p)
 
-	for _, m := range sc.ms {
-		gocurses.Mvaddch(m.y, m.x, 'M')
+	for i, m := range sc.ms {
+		gocurses.Mvaddch(m.loc.y, m.loc.x, 'M')
+		gocurses.Mvaddstr(sc.size.y+1+i, 0, fmt.Sprintf("%2d x %2d", m.loc.y, m.loc.x))
 	}
 	gocurses.Mvaddstr(sc.size.y, 0, fmt.Sprintf("Dots Left: %3d", sc.dots))
 	gocurses.Refresh()
@@ -46,6 +47,10 @@ func updateView(sc *screen) {
 
 func disposeView() {
 	gocurses.End()
+}
+
+func getChFromView() rune {
+	return rune(gocurses.Stdscr.Getch())
 }
 
 func confViewCapable(sc *screen) {

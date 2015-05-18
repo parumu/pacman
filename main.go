@@ -1,32 +1,33 @@
 package main
 
-import (
-	"time"
-
-	"github.com/parumu/gocurses"
-)
+import "time"
 
 var vecLeft, vecRight, vecUp, vecDown = xy{-1, 0}, xy{1, 0}, xy{0, -1}, xy{0, 1}
+var allVecs = []xy{vecLeft, vecRight, vecUp, vecDown}
 
 func movePacman(sc *screen, vec xy) {
-	np := sc.p.add(vec)
-
-	// handle entering warp hole
-	if np.x == -1 {
-		np.x = sc.size.x - 1
-	} else if np.x == sc.size.x {
-		np.x = 0
+	if b, loc := sc.tryMove(sc.p.loc.add(vec)); b {
+		sc.p.move(loc, vec)
 	}
-
-	sc.tryMovePacman(np)
 }
 
-func moveMonsters(sc *screen) {
+func moveMonster(sc *screen, m *monster) {
+	for {
+		vec := m.vec
+		if m.time == 0 {
+			vec = m.getNextVec(m, sc)
+		}
+		m.liveLife()
 
+		if b, loc := sc.tryMove(m.loc.add(vec)); b {
+			m.move(loc, vec)
+			return
+		}
+	}
 }
 
-func getUserInput(vec xy) (xy, bool) {
-	switch gocurses.Stdscr.Getch() {
+func getPacmanVec(vec xy) (xy, bool) {
+	switch getChFromView() {
 	case 'h':
 		vec = vecLeft
 	case 'j':
@@ -43,21 +44,25 @@ func getUserInput(vec xy) (xy, bool) {
 }
 
 func runGame(sc *screen) {
-	vec, quitGame := vecLeft, false
 Game:
 	for {
-		vec, quitGame = getUserInput(vec)
+		vec, quitGame := getPacmanVec(sc.p.vec)
 		if quitGame {
 			break Game
 		}
 		movePacman(sc, vec)
-		moveMonsters(sc)
 
-		if sc.hitMonster() {
-			if sc.hasExtraPower() {
+		for i := 0; i < len(sc.ms); i++ {
+			m := &sc.ms[i]
+			moveMonster(sc, m)
+		}
+
+		if sc.pacmanMetMonster() {
+			if sc.p.hasExtraPower() {
 				// eat monster
 				// reset monster location
 			} else {
+				updateView(sc)
 				break Game // pacman died
 			}
 		}
@@ -67,7 +72,7 @@ Game:
 			sc.eatFood()
 		case powerFood:
 			sc.eatFood()
-			sc.addExtraPower(100)
+			sc.p.addExtraPower(100)
 		}
 
 		updateView(sc)
@@ -78,11 +83,19 @@ Game:
 	}
 }
 
+func buildMonsters() []monster {
+	random := monster{getNextVec: getNextVecRandomly, stablePeriod: 5}
+	shortestPath := monster{getNextVec: getNextVecOfShortestPath, stablePeriod: 3}
+	return []monster{random, shortestPath}
+}
+
 func main() {
 	initView()
 	defer disposeView()
 
-	sc := buildScreen()
+	p := buildPacman()
+	ms := buildMonsters()
+	sc := buildScreen(p, ms)
 	confViewCapable(&sc)
 
 	runGame(&sc)

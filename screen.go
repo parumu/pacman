@@ -18,16 +18,38 @@ func (a *xy) add(b xy) xy {
 }
 
 type screen struct {
-	p          xy
-	ms         []xy
-	mat        [][]rune
-	size       xy
-	dots       int
-	extraPower int
+	p    pacman
+	ms   []monster
+	mat  [][]rune
+	size xy
+	dots int
 }
 
-func canMoveTo(sc *screen, xy xy) bool {
-	return sc.mat[xy.y][xy.x] != '+'
+func (sc *screen) cloneMat() [][]rune {
+	newMat := make([][]rune, len(sc.mat))
+	for row := 0; row < len(sc.mat); row++ {
+		newRow := make([]rune, len(sc.mat[row]))
+		newMat[row] = newRow
+		for col := 0; col < len(sc.mat[row]); col++ {
+			newRow[col] = sc.mat[row][col]
+		}
+	}
+	return newMat
+}
+
+// returns if loc is on path adjusting loc in warp hole case
+func (sc *screen) tryMove(loc xy) (bool, xy) {
+	// handle warp hole case
+	if loc.x == -1 {
+		loc.x = sc.size.x - 1
+	} else if loc.x == sc.size.x {
+		loc.x = 0
+	}
+
+	if sc.mat[loc.y][loc.x] == '+' {
+		return false, loc
+	}
+	return true, loc
 }
 
 func (sc *screen) getMatCell(xy xy) rune {
@@ -39,66 +61,45 @@ func (sc *screen) setMatCell(xy xy, c rune) {
 }
 
 func (sc *screen) stuffUnderPacman() string {
-	switch sc.getMatCell(sc.p) {
+	switch sc.getMatCell(sc.p.loc) {
 	case '.':
-		return "Food"
+		return food
 	case 'O':
-		return "PowerFood"
+		return powerFood
 	default:
-		return "None"
+		return none
 	}
 }
 
 func (sc *screen) eatFood() {
-	switch c := sc.getMatCell(sc.p); c {
+	switch c := sc.getMatCell(sc.p.loc); c {
 	case '.', 'O':
 		sc.dots--
-		sc.setMatCell(sc.p, ' ')
+		sc.setMatCell(sc.p.loc, ' ')
 	}
 }
 
-func (sc *screen) tryMovePacman(np xy) {
-	if canMoveTo(sc, np) {
-		sc.p = np
-	}
-	if sc.extraPower > 0 {
-		sc.extraPower--
-	}
-}
-
-func (sc *screen) hasExtraPower() bool {
-	return sc.extraPower > 0
-}
-
-func (sc *screen) addExtraPower(i int) {
-	sc.extraPower += i
-}
-
-func (sc *screen) hitMonster() bool {
+func (sc *screen) pacmanMetMonster() bool {
 	for _, m := range sc.ms {
-		if m == sc.p {
+		if m.loc == sc.p.loc {
 			return true
 		}
 	}
 	return false
 }
 
-func buildScreen() screen {
+func buildScreen(p pacman, ms []monster) screen {
 	s := `
 ++++++++++++++|
 +            +|
-+ ++++ +++++ +|
 +O++++ +++++ +|
-+ ++++ +++++ +|
 +             |
 + ++++ + +++++|
 +      +     +|
 ++++++ +++++ +|
 ++++++ +      |
 ++++++ + ++++*|
-++++++ + ++++*|
 ******   ++++M|
-++++++ + +++++|
 ++++++ + +++++|
 ++++++ +      |
 ++++++ + +++++|
@@ -134,7 +135,7 @@ func buildScreen() screen {
 	maxX := len(m[0])
 
 	// deploy items
-	p, o := xy{}, xy{}
+	pLoc, mLoc := xy{}, xy{}
 	dots := 0
 
 	for row := 0; row < maxY; row++ {
@@ -148,22 +149,27 @@ func buildScreen() screen {
 			case '*':
 				*c = ' '
 			case 'P':
-				p.y = row
-				p.x = col
+				pLoc.y = row
+				pLoc.x = col
 				*c = ' '
 			case 'M':
-				o.y = row
-				o.x = col
+				mLoc.y = row
+				mLoc.x = col
 				*c = ' '
 			}
 		}
 	}
 
+	// set starting locations
+	p.loc = pLoc
+	for i := 0; i < len(ms); i++ {
+		ms[i].loc = mLoc
+	}
+
 	return screen{
-		p:          p,
-		ms:         []xy{o, o, o, o},
-		mat:        m,
-		size:       xy{maxX, maxY},
-		dots:       dots,
-		extraPower: 0}
+		p:    p,
+		ms:   ms,
+		mat:  m,
+		size: xy{maxX, maxY},
+		dots: dots}
 }
