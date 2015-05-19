@@ -91,11 +91,11 @@ func getNextVecOfXestPath(m *monster, sc *screen, pred func(int, int) bool, dist
 }
 
 func getNextVecOfShortestPath(m *monster, sc *screen) vec {
-	smaller := func(a int, b int) bool { return a < b }
-	return getNextVecOfXestPath(m, sc, smaller, math.MaxInt16)
+	pred := func(a int, b int) bool { return a < b }
+	return getNextVecOfXestPath(m, sc, pred, math.MaxInt16)
 }
 
 func getNextVecOfLongestPath(m *monster, sc *screen) vec {
-	smaller := func(a int, b int) bool { return a > b }
-	return getNextVecOfXestPath(m, sc, smaller, -1)
+	pred := func(a int, b int) bool { return a > b }
+	return getNextVecOfXestPath(m, sc, pred, -1)
 }
